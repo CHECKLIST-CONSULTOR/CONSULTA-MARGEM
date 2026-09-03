@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Simulação de Venda e Precificação - Tributos e Rentabilidade</title>
+    <!-- Biblioteca SheetJS para exportar para Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0f1720; color: #e6eef8; padding: 15px; max-width: 1650px; margin: auto; }
+        
+        /* Tela de Login */
+        #telaLogin {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 90vh;
+        }
+        .box-login {
+            background: #161f2c;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.7);
+            width: 100%;
+            max-width: 350px;
+            text-align: center;
+        }
+        .box-login h2 { margin-bottom: 20px; color: #38bdf8; }
+        .erro-login { color: #ef4444; font-size: 12px; margin-top: 10px; display: none; }
+
+        /* Sistema Principal (Escondido até logar) */
+        #sistemaPrincipal { display: none; }
+
+        .topo-sistema {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #161f2c;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .topo-info-bloco {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .topo-sistema h1 { font-size: 16px; color: #38bdf8; margin: 0; }
+        .topo-sistema .sub-empresa { font-size: 12px; color: #94a3b8; font-weight: bold; }
+        .topo-sistema .sub-supervisor { font-size: 11px; color: #38bdf8; margin-top: 2px; }
+        
+        .topo-acoes-usuario {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .btn-logout { background: #ef4444 !important; width: auto !important; padding: 6px 12px !important; font-size: 12px; }
+        .btn-logout:hover { background: #dc2626 !important; }
+
+        .card { background: #161f2c; padding: 20px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); margin-bottom: 20px; }
+        input, button { font-family: inherit; font-size: 12px; padding: 6px; margin: 2px 0; border-radius: 6px; border: 1px solid #334155; background: #0b1220; color: #fff; width: 100%; box-sizing: border-box; }
+        input:focus { border-color: #3b82f6; outline: none; }
+        button { background: #3b82f6; border: none; cursor: pointer; font-weight: bold; width: auto; padding: 10px 20px; }
+        button:hover { background: #2563eb; }
+        .btn-acao { padding: 4px 8px; font-size: 11px; margin-right: 2px; }
+        .btn-editar { background: #eab308; color: #000; }
+        .btn-editar:hover { background: #ca8a04; }
+        .btn-remover { background: #ef4444; }
+        .btn-remover:hover { background: #dc2626; }
+        .btn-excel { background: #10b981; margin-top: 10px; }
+        .btn-excel:hover { background: #059669; }
+        .btn-pdf { background: #8b5cf6; margin-top: 10px; margin-left: 10px; }
+        .btn-pdf:hover { background: #7c3aed; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+        th, td { border: 1px solid #334155; padding: 6px; text-align: center; white-space: nowrap; }
+        th { background: #1e293b; color: #94a3b8; }
+        
+        /* Grade ajustada para forçar todos os 10 campos + botão ficarem em uma linha contínua */
+        .grid-form { 
+            display: grid; 
+            grid-template-columns: 1.4fr 1fr 0.8fr 0.8fr 0.8fr 0.8fr 0.7fr 0.7fr 0.7fr 0.8fr 40px; 
+            gap: 6px; 
+            align-items: end; 
+        }
+        .grid-form label {
+            font-size: 10px;
+            color: #94a3b8;
+            white-space: nowrap;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .linha-lote { border-bottom: 1px dashed #334155; padding-bottom: 10px; margin-bottom: 10px; }
+        .painel-inferior { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-top: 15px; }
+        .totais { font-size: 16px; font-weight: bold; color: #86efac; text-align: right; }
+        
+        /* Cabeçalho oculto que aparece apenas na impressão do PDF */
+        .cabecalho-print {
+            display: none;
+        }
+
+        /* Estilo exclusivo para Impressão / PDF limpo */
+        @media print {
+            body { background: #ffffff !important; color: #000000 !important; }
+            #sistemaPrincipal { display: block !important; }
+            .card:not(#cardTabela), .topo-sistema, .grid-form, .btn-excel, .btn-pdf, .acoes-coluna, th:last-child, td:last-child, .btn-acao {
+                display: none !important;
+            }
+            .cabecalho-print {
+                display: block !important;
+                margin-bottom: 15px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 10px;
+            }
+            .cabecalho-print h2 { font-size: 14px; margin: 0 0 5px 0; color: #000; }
+            .cabecalho-print p { font-size: 11px; margin: 2px 0; color: #333; }
+
+            #cardTabela { border: none; box-shadow: none; padding: 0; background: #ffffff !important; color: #000000 !important; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th, td { border: 1px solid #000 !important; color: #000 !important; background: #fff !important; }
+            th { background: #e2e8f0 !important; }
+            .totais { color: #000 !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TELA DE LOGIN -->
+    <div id="telaLogin">
+        <div class="box-login">
+            <h2>🔐 Acesso Restrito</h2>
+            <div style="text-align: left;"><label>Usuário:</label></div>
+            <input type="text" id="usuario" placeholder="Digite seu usuário">
+            
+            <div style="text-align: left; margin-top: 10px;"><label>Senha:</label></div>
+            <input type="password" id="senha" placeholder="Digite sua senha" onkeypress="if(event.key === 'Enter') fazerLogin()">
+            
+            <button type="button" style="width: 100%; margin-top: 15px;" onclick="fazerLogin()">Entrar</button>
+            <div id="erroLogin" class="erro-login">Usuário ou senha incorretos!</div>
+        </div>
+    </div>
+
+    <!-- SISTEMA PRINCIPAL -->
+    <div id="sistemaPrincipal">
+        
+        <!-- TOPO / HEADER UNIFICADO -->
+        <div class="topo-sistema">
+            <div class="topo-info-bloco">
+                <h1>📦 Sistema de Precificação e Rentabilidade — TECHNICO MAQUINAS CASE</h1>
+                
+            </div>
+            <div class="topo-acoes-usuario">
+                <span id="infoUsuarioLogado" style="color: #94a3b8; font-size: 13px;">Usuário: <b>admin</b></span>
+                <button type="button" class="btn btn-logout" onclick="fazerLogout()">🚪 Sair</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 id="tituloForm">Adicionar Produtos (Simulação em Lote ou Unitária)</h2>
+            <input type="hidden" id="editIndex" value="-1">
+            
+            <div id="containerLinhasLote">
+                <div class="grid-form linha-lote">
+                    <div><label>Referência</label><input type="text" class="lote-ref" placeholder="Ex: YN15V"></div>
+                    <div><label>V. Unit (R$)</label><input type="number" class="lote-vUnit" step="0.01" placeholder="0.00"></div>
+                    <div><label>IPI (%)</label><input type="number" class="lote-aliqIpi" step="0.01" value="3.25"></div>
+                    <div><label>ICMS (%)</label><input type="number" class="lote-aliqIcms" step="0.01" value="4.00"></div>
+                    <div><label>MVA (%)</label><input type="number" class="lote-mva" step="0.01" value="107.43"></div>
+                    <div><label>Frete (R$)</label><input type="number" class="lote-vlrFrete" step="0.01" value="0.00"></div>
+                    <div><label>PIS (%)</label><input type="number" class="lote-aliqPis" step="0.01" value="1.65"></div>
+                    <div><label>COFINS (%)</label><input type="number" class="lote-aliqCofins" step="0.01" value="7.60"></div>
+                    <div><label>CSLL (%)</label><input type="number" class="lote-aliqCsll" step="0.01" value="2.88"></div>
+                    <div><label>Rentab (%)</label><input type="number" class="lote-rentabilidade" step="0.01" value="24.08"></div>
+                    <div><button type="button" class="btn btn-remover" onclick="removerLinhaLote(this)" style="padding: 6px; font-size: 10px;" title="Excluir linha">🗑️</button></div>
+                </div>
+            </div>
+
+            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                <button type="button" class="btn" style="background: #334155;" onclick="adicionarNovaLinhaLote()">➕ Adicionar Outra Linha</button>
+                <button type="button" id="btnSalvar" class="btn btn-success" onclick="salvarProdutosLote()">💾 Inserir Todos na Lista</button>
+            </div>
+        </div>
+
+        <div class="card" id="cardTabela">
+            <!-- Cabeçalho visível exclusivamente na impressão/PDF -->
+            <div class="cabecalho-print">
+                <h2>Sistema de Precificação e Rentabilidade - TECHNICO MAQUINAS CASE</h2>
+                <p><b>Unidades:</b> Salvador • Petrolina • Jaboatão • Fortaleza</p>
+                <p><b>Supervisor Comercial:</b> Ademir Ribeiro dos Santos</p>
+                <p><b>Data da Emissão:</b> <span id="dataAtualPrint"></span></p>
+            </div>
+
+            <h2>Itens Lançados e Preço de Venda Sugerido</h2>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ref</th>
+                            <th>V. Unit</th>
+                            <th>Vlr IPI</th>
+                            <th>Vlr ICMS</th>
+                            <th>Base ICMS ST</th>
+                            <th>Frete</th>
+                            <th>Valor ICMS ST</th>
+                            <th>Custo TNF</th>
+                            <th>Tributos (PIS/COF/CSLL)</th>
+                            <th>Preço Venda</th>
+                            <th>Lucro (R$)</th>
+                            <th>Rentab. Real (%)</th>
+                            <th class="acoes-coluna">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelaProdutos">
+                        <tr><td colspan="13" style="color: #64748b;">Nenhum produto adicionado ainda.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="painel-inferior">
+                <div>
+                    <button type="button" class="btn btn-excel" onclick="exportarExcel()">📥 Salvar em Excel (.xlsx)</button>
+                    <button type="button" class="btn btn-pdf" onclick="exportarPDF()">📄 Salvar em PDF</button>
+                </div>
+                <div class="totais" id="valorTotalGeral">Total Geral da Venda Sugerida: R$ 0,00</div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// Lista de usuários permitidos (com senha 123456)
+const USUARIOS_PERMITIDOS = [
+    { usuario: "ademir", senha: "123456" },
+    { usuario: "zoly", senha: "123456" }
+];
+
+// Atualiza a data no relatório de impressão
+document.getElementById('dataAtualPrint').innerText = new Date().toLocaleDateString('pt-BR');
+
+function fazerLogin() {
+    const userDigitado = document.getElementById('usuario').value.trim().toLowerCase();
+    const passDigitada = document.getElementById('senha').value;
+    const erroDiv = document.getElementById('erroLogin');
+
+    // Procura na lista considerando letras maiúsculas/minúsculas iguais
+    const usuarioEncontrado = USUARIOS_PERMITIDOS.find(u => u.usuario.toLowerCase() === userDigitado && u.senha === passDigitada);
+
+    if (usuarioEncontrado) {
+        document.getElementById('telaLogin').style.display = 'none';
+        document.getElementById('sistemaPrincipal').style.display = 'block';
+        document.getElementById('infoUsuarioLogado').innerHTML = `Usuário: <b>${document.getElementById('usuario').value.trim()}</b>`;
+    } else {
+        erroDiv.style.display = 'block';
+    }
+}
+
+function fazerLogout() {
+    if (confirm("Deseja realmente sair do sistema?")) {
+        document.getElementById('sistemaPrincipal').style.display = 'none';
+        document.getElementById('telaLogin').style.display = 'flex';
+        document.getElementById('usuario').value = '';
+        document.getElementById('senha').value = '';
+        document.getElementById('erroLogin').style.display = 'none';
+        document.getElementById('usuario').focus();
+    }
+}
+
+let listaProdutos = [];
+
+function adicionarNovaLinhaLote() {
+    const container = document.getElementById('containerLinhasLote');
+    const primeiraLinha = container.querySelector('.linha-lote');
+    const novaLinha = primeiraLinha.cloneNode(true);
+    
+    novaLinha.querySelectorAll('input').forEach(input => {
+        if (!input.classList.contains('lote-aliqIpi') && 
+            !input.classList.contains('lote-aliqIcms') && 
+            !input.classList.contains('lote-mva') && 
+            !input.classList.contains('lote-vlrFrete') &&
+            !input.classList.contains('lote-aliqPis') &&
+            !input.classList.contains('lote-aliqCofins') &&
+            !input.classList.contains('lote-aliqCsll') &&
+            !input.classList.contains('lote-rentabilidade')) {
+            input.value = '';
+        }
+    });
+    container.appendChild(novaLinha);
+}
+
+function removerLinhaLote(botao) {
+    const linhas = document.querySelectorAll('.linha-lote');
+    if (linhas.length > 1) {
+        botao.closest('.linha-lote').remove();
+    } else {
+        alert('Você precisa manter pelo menos uma linha de cadastro.');
+    }
+}
+
+function salvarProdutosLote() {
+    const linhas = document.querySelectorAll('.linha-lote');
+    let editIndex = parseInt(document.getElementById('editIndex').value);
+    let novosItens = [];
+
+    for (let i = 0; i < linhas.length; i++) {
+        const l = linhas[i];
+        const ref = l.querySelector('.lote-ref').value || `PROD-0${i+1}`;
+        const vUnit = parseFloat(l.querySelector('.lote-vUnit').value) || 0;
+        const aliqIpi = parseFloat(l.querySelector('.lote-aliqIpi').value) || 0;
+        const aliqIcms = parseFloat(l.querySelector('.lote-aliqIcms').value) || 0;
+        const mva = parseFloat(l.querySelector('.lote-mva').value) || 0;
+        const vlrFrete = parseFloat(l.querySelector('.lote-vlrFrete').value) || 0;
+        
+        const aliqPis = parseFloat(l.querySelector('.lote-aliqPis').value) || 0;
+        const aliqCofins = parseFloat(l.querySelector('.lote-aliqCofins').value) || 0;
+        const aliqCsll = parseFloat(l.querySelector('.lote-aliqCsll').value) || 0;
+        const rentabDesejada = parseFloat(l.querySelector('.lote-rentabilidade').value) || 0;
+
+        if (vUnit <= 0) {
+            alert(`Informe um valor unitário válido para o item da referência: ${ref}`);
+            return;
+        }
+
+        const vlrIpi = vUnit * (aliqIpi / 100);
+        const vlrIcms = vUnit * (aliqIcms / 100);
+        const baseIcmsSt = (vUnit + vlrIpi) * (1 + (mva / 100));
+        
+        let vlrIcmsSt = (baseIcmsSt * (20.5 / 100)) - vlrIcms;
+        if (vlrIcmsSt < 0) vlrIcmsSt = 0;
+
+        const custoTnf = vUnit + vlrIpi + vlrFrete + vlrIcmsSt;
+        
+        const percTotalDeducoes = (aliqPis + aliqCofins + aliqCsll + rentabDesejada) / 100;
+        let precoVenda = 0;
+        if (percTotalDeducoes < 1) {
+            precoVenda = custoTnf / (1 - percTotalDeducoes);
+        }
+
+        const vlrPis = precoVenda * (aliqPis / 100);
+        const vlrCofins = precoVenda * (aliqCofins / 100);
+        const vlrCsll = precoVenda * (aliqCsll / 100);
+        
+        const lucroReais = precoVenda - custoTnf - vlrPis - vlrCofins - vlrCsll;
+        const rentabilidadeReal = (lucroReais / precoVenda) * 100;
+
+        novosItens.push({
+            ref, vUnit, aliqIpi, vlrIpi, aliqIcms, vlrIcms,
+            mva, baseIcmsSt, vlrFrete, vlrIcmsSt,
+            custoTnf, aliqPis, aliqCofins, aliqCsll,
+            precoVenda, lucroReais, rentabilidadeReal
+        });
+    }
+
+    if (editIndex === -1) {
+        listaProdutos = listaProdutos.concat(novosItens);
+    } else {
+        listaProdutos[editIndex] = novosItens[0];
+        document.getElementById('editIndex').value = -1;
+        document.getElementById('tituloForm').innerText = 'Adicionar Produtos (Simulação em Lote ou Unitária)';
+        document.getElementById('btnSalvar').innerText = 'Inserir Todos na Lista';
+    }
+
+    atualizarTabela();
+    resetarFormularioLote();
+}
+
+function resetarFormularioLote() {
+    const container = document.getElementById('containerLinhasLote');
+    container.innerHTML = `
+        <div class="grid-form linha-lote">
+            <div><label>Referência</label><input type="text" class="lote-ref" placeholder="Ex: YN15V"></div>
+            <div><label>V. Unit (R$)</label><input type="number" class="lote-vUnit" step="0.01" placeholder="0.00"></div>
+            <div><label>IPI (%)</label><input type="number" class="lote-aliqIpi" step="0.01" value="3.25"></div>
+            <div><label>ICMS (%)</label><input type="number" class="lote-aliqIcms" step="0.01" value="4.00"></div>
+            <div><label>MVA (%)</label><input type="number" class="lote-mva" step="0.01" value="107.43"></div>
+            <div><label>Frete (R$)</label><input type="number" class="lote-vlrFrete" step="0.01" value="0.00"></div>
+            <div><label>PIS (%)</label><input type="number" class="lote-aliqPis" step="0.01" value="1.65"></div>
+            <div><label>COFINS (%)</label><input type="number" class="lote-aliqCofins" step="0.01" value="7.60"></div>
+            <div><label>CSLL (%)</label><input type="number" class="lote-aliqCsll" step="0.01" value="2.88"></div>
+            <div><label>Rentab (%)</label><input type="number" class="lote-rentabilidade" step="0.01" value="24.08"></div>
+            <div><button type="button" class="btn btn-remover" onclick="removerLinhaLote(this)" style="padding: 6px; font-size: 10px;" title="Excluir linha">🗑️</button></div>
+        </div>
+    `;
+}
+
+function editarProduto(index) {
+    const p = listaProdutos[index];
+    document.getElementById('editIndex').value = index;
+    document.getElementById('tituloForm').innerText = `Editando Referência: ${p.ref}`;
+    document.getElementById('btnSalvar').innerText = 'Atualizar Item';
+
+    const container = document.getElementById('containerLinhasLote');
+    container.innerHTML = `
+        <div class="grid-form linha-lote">
+            <div><label>Referência</label><input type="text" class="lote-ref" value="${p.ref}"></div>
+            <div><label>V. Unit (R$)</label><input type="number" class="lote-vUnit" step="0.01" value="${p.vUnit}"></div>
+            <div><label>IPI (%)</label><input type="number" class="lote-aliqIpi" step="0.01" value="${p.aliqIpi}"></div>
+            <div><label>ICMS (%)</label><input type="number" class="lote-aliqIcms" step="0.01" value="${p.aliqIcms}"></div>
+            <div><label>MVA (%)</label><input type="number" class="lote-mva" step="0.01" value="${p.mva}"></div>
+            <div><label>Frete (R$)</label><input type="number" class="lote-vlrFrete" step="0.01" value="${p.vlrFrete}"></div>
+            <div><label>PIS (%)</label><input type="number" class="lote-aliqPis" step="0.01" value="${p.aliqPis}"></div>
+            <div><label>COFINS (%)</label><input type="number" class="lote-aliqCofins" step="0.01" value="${p.aliqCofins}"></div>
+            <div><label>CSLL (%)</label><input type="number" class="lote-aliqCsll" step="0.01" value="${p.aliqCsll}"></div>
+            <div><label>Rentab (%)</label><input type="number" class="lote-rentabilidade" step="0.01" value="${p.rentabilidadeReal}"></div>
+            <div><button type="button" class="btn btn-remover" onclick="removerLinhaLote(this)" style="padding: 6px; font-size: 10px;" title="Excluir linha">🗑️</button></div>
+        </div>
+    `;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function removerProduto(index) {
+    listaProdutos.splice(index, 1);
+    atualizarTabela();
+}
+
+function atualizarTabela() {
+    const tbody = document.getElementById('tabelaProdutos');
+    if (listaProdutos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="13" style="color: #64748b;">Nenhum produto adicionado ainda.</td></tr>`;
+        document.getElementById('valorTotalGeral').innerText = 'Total Geral da Venda Sugerida: R$ 0,00';
+        return;
+    }
+
+    let html = '';
+    let somaVendaGeral = 0;
+
+    listaProdutos.forEach((p, index) => {
+        somaVendaGeral += p.precoVenda;
+        html += `
+            <tr>
+                <td><b>${p.ref}</b></td>
+                <td>R$ ${p.vUnit.toFixed(2)}</td>
+                <td>R$ ${p.vlrIpi.toFixed(2)}</td>
+                <td>R$ ${p.vlrIcms.toFixed(2)}</td>
+                <td>R$ ${p.baseIcmsSt.toFixed(2)}</td>
+                <td>R$ ${p.vlrFrete.toFixed(2)}</td>
+                <td style="color: #f59e0b; font-weight: bold;">R$ ${p.vlrIcmsSt.toFixed(2)}</td>
+                <td style="color: #fca5a5; font-weight: bold;">R$ ${p.custoTnf.toFixed(2)}</td>
+                <td>${p.aliqPis}% / ${p.aliqCofins}% / ${p.aliqCsll}%</td>
+                <td style="color: #86efac; font-weight: bold;">R$ ${p.precoVenda.toFixed(2)}</td>
+                <td style="color: #38bdf8; font-weight: bold;">R$ ${p.lucroReais.dump ? '' : p.lucroReais.toFixed(2)}</td>
+                <td style="color: #34d399; font-weight: bold;">${p.rentabilidadeReal.toFixed(2)}%</td>
+                <td class="acoes-coluna">
+                    <button class="btn-acao btn-editar" onclick="editarProduto(${index})">Editar</button>
+                    <button class="btn-acao btn-remover" onclick="removerProduto(${index})">Excluir</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+    document.getElementById('valorTotalGeral').innerText = `Total Geral da Venda Sugerida: R$ ${somaVendaGeral.toFixed(2)}`;
+}
+
+function exportarExcel() {
+    if (listaProdutos.length === 0) {
+        alert('Não há produtos na lista para exportar!');
+        return;
+    }
+
+    let dadosExportacao = listaProdutos.map(p => ({
+        "Referência": p.ref,
+        "Vlr Unitário": p.vUnit,
+        "Vlr IPI": p.vlrIpi,
+        "Vlr ICMS": p.vlrIcms,
+        "Base ICMS ST": p.baseIcmsSt,
+        "Valor Frete": p.vlrFrete,
+        "Valor ICMS ST": p.vlrIcmsSt,
+        "Custo Total TNF": p.custoTnf,
+        "Alíq PIS (%)": p.aliqPis,
+        "Alíq COFINS (%)": p.aliqCofins,
+        "Alíq CSLL (%)": p.aliqCsll,
+        "Preço de Venda": p.precoVenda,
+        "Lucro Líquido (R$)": p.lucroReais,
+        "Rentabilidade Real (%)": p.rentabilidadeReal
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dadosExportacao);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Simulacao Venda");
+    XLSX.writeFile(workbook, "Relatorio_Simulacao_Venda.xlsx");
+}
+
+function exportarPDF() {
+    if (listaProdutos.length === 0) {
+        alert('Não há produtos na lista para gerar o relatório em PDF!');
+        return;
+    }
+    window.print();
+}
+</script>
+
+</body>
+</html>
